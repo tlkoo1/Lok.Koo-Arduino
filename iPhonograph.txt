@@ -1,0 +1,100 @@
+int lastSent = 0;
+int lastSensed = 0;
+int potPin = 1;   // White to ANALOG  1
+int butPin = 2;   // Red to digital 2
+int rightPin = 3;  // Red to digital 3
+int leftPin = 4; // Red to digital 4
+int ledPin = 6;   // Red to digital 6
+boolean flashing = false;
+int brightness = 0;
+boolean left = false;
+boolean mid = false;
+boolean right = false;
+
+void setup()
+{
+  pinMode(potPin,INPUT);
+  pinMode(butPin,INPUT);
+  pinMode(leftPin,INPUT);
+  pinMode(rightPin,INPUT);
+  pinMode(ledPin,OUTPUT);
+  digitalWrite(butPin,HIGH);
+  digitalWrite(leftPin,HIGH);
+  digitalWrite(rightPin,HIGH);
+  Serial.begin(9600);
+}
+
+void loop()
+{
+  if(Serial.available()>0) {
+    char command = Serial.read();
+    if(command == '1') flashing = true;
+    else if(command == '0') flashing = false;
+  }
+  
+  int l = digitalRead(leftPin);
+  int r = digitalRead(rightPin);
+  if(isClosed(l) && (!left)) {
+    Serial.println("L");
+    left = true;
+    mid = false;
+    right = false;
+  }
+  if(isClosed(r) && (!right)) {
+    Serial.println("R");
+    left = false;
+    mid = false;
+    right = true;
+  }
+  if((!isClosed(l)) && (!isClosed(r)) && (!mid)) {
+    Serial.println("M");
+    left = false;
+    mid = true;
+    right = false;
+  }
+  
+  int rawValue = analogRead(potPin);
+  if(abs(rawValue-lastSensed) > 7) {
+    lastSensed = rawValue;
+    int trackNumber = convertToTrack(rawValue);
+    if(trackNumber != lastSent) {
+      Serial.println(trackNumber);
+      lastSent = trackNumber;
+    }
+  }
+
+  // We want to delay for a bit to avoid rapid sensing
+  // of the track slider, but we can't ignore the bellows
+  // because we might miss a click and we need to keep flashing !
+  for(int i=0; i<12 ;i++) {
+    delay(50);
+    if(flashing) {
+      brightness += random(-40,40);
+      if(brightness<20) brightness = 20;
+      if(brightness>255) brightness = 255;
+      analogWrite(ledPin,brightness);
+    }
+    else analogWrite(ledPin,0);
+    if(isClosed(digitalRead(butPin))) {
+      Serial.println("B");
+      delay(250);
+    }
+  }
+
+}
+
+boolean isClosed(int i)
+{
+  return i==0;
+}
+
+int convertToTrack(int reading)
+{
+  if(reading>1013) return 1;
+  if(reading>905) return 2;
+  if(reading>673) return 3;
+  if(reading>417) return 4;
+  if(reading>188) return 5;
+  if(reading>15) return 6;
+  return 7;
+}
